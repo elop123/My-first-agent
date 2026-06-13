@@ -9,7 +9,7 @@ No more writing boilerplate test cases manually.
 
 - Input: a user story with acceptance criteria
 - Output: structured test cases with step-by-step instructions
-- Time saved: ~2 hours of manual work → 10 seconds
+- High Productivity: speeds up the workflow by creating comprehensive test coverage, eliminating hours of manual writing.
 
 ## Example
 
