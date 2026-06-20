@@ -1,39 +1,42 @@
 import Anthropic from '@anthropic-ai/sdk'
-import 'dotenv/config'
+import dotenv from 'dotenv'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '.env') })
+
+const args = process.argv.slice(2)
+const fileFlag = args.indexOf('--file')
+const storyFlag = args.indexOf('--story')
+
+const userStory = fileFlag !== -1
+  ? fs.readFileSync(args[fileFlag + 1], 'utf-8')
+  : storyFlag !== -1
+    ? args[storyFlag + 1]
+    : (() => { console.error('Usage: node agent.js --story "<text>" | --file <path>'); process.exit(1) })()
 
 const client = new Anthropic()
 
-const myUserStory = `
-  As a user I want to log in with email and password
-  so that I can access my account.
-  AC: Show error if password wrong. Lock after 5 attempts.
-`
-
 const prompt = `You are a senior QA engineer.
-Read this user story and generate test cases.
-Return ONLY valid JSON starting with { and ending with }.
-No markdown. No backticks. No explanation.
-Format: { "testCases": [ { "id": "TC-01", "title": "string", "steps": ["string"], "priority": "High" } ] }
+Read this user story and generate test cases, including edge cases and negative scenarios.
+Return ONLY valid JSON starting with { and ending with }. No markdown, no backticks, no explanation.
+Format: { "testCases": [ { "title": "string", "preconditions": "string", "steps": ["string"], "expectedResult": "string", "priority": "High" } ] }
 
-USER STORY: ${myUserStory}`
+USER STORY: ${userStory}`
 
 const response = await client.messages.create({
   model: 'claude-sonnet-4-6',
   max_tokens: 4000,
-  messages: [{ role: 'user', content: prompt }]
+  messages: [{ role: 'user', content: prompt }],
 })
 
-const raw = response.content[0].text.trim()
-const clean = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '')
-const result = JSON.parse(clean)
+const clean = response.content[0].text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '')
+const { testCases } = JSON.parse(clean)
 
-console.log(`\n✅ Generated ${result.testCases.length} test cases\n`)
-
-result.testCases.forEach((tc, i) => {
-  console.log(`TC-${i+1}: ${tc.title}`)
-  console.log(`  Priority: ${tc.priority || 'not set'}`)
-  tc.steps.forEach((step, s) => {
-    console.log(`  Step ${s+1}: ${step}`)
-  })
-  console.log('')
+console.log(`| ID | Title | Preconditions | Steps | Expected Result | Status |`)
+console.log(`|---|---|---|---|---|---|`)
+testCases.forEach((tc, i) => {
+  const steps = tc.steps.map((s, idx) => `${idx + 1}. ${s}`).join('<br>')
+  console.log(`| TC-AI-${i + 1} | ${tc.title} | ${tc.preconditions || '-'} | ${steps} | ${tc.expectedResult} | ⬜ |`)
 })
